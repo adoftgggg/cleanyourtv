@@ -6,6 +6,8 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
@@ -56,6 +58,13 @@ final class Appearance {
                 view.setBackgroundColor(p.surfaceRaised);
             }
         }
+        if (view.isFocusable() && view.isClickable()) {
+            StateListDrawable states = new StateListDrawable();
+            states.addState(new int[]{android.R.attr.state_focused}, shape(p.focus, p.border, 2));
+            states.addState(new int[]{android.R.attr.state_selected}, shape(p.selected, p.border, 1));
+            states.addState(new int[]{}, shape(p.surfaceRaised, p.surfaceRaised, 0));
+            view.setBackground(states);
+        }
         if (view instanceof TextView) {
             TextView text = (TextView) view;
             int color = text.getCurrentTextColor();
@@ -66,6 +75,14 @@ final class Appearance {
             ViewGroup group = (ViewGroup) view;
             for (int i = 0; i < group.getChildCount(); i++) styleTree(group.getChildAt(i), p);
         }
+    }
+
+    private static GradientDrawable shape(int fill, int stroke, int width) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(fill);
+        drawable.setCornerRadius(14f);
+        if (width > 0) drawable.setStroke(width, stroke);
+        return drawable;
     }
 
     private static boolean near(int a, int b) {
