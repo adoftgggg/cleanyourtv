@@ -159,8 +159,4 @@
     <string name="clock_format_12">12-hour</string>
     <string name="clock_format_24">24-hour</string>
     <string name="ota_update">Mise à jour</string>
-    <string name="appearance_label">Apparence</string>
-    <string name="appearance_state">Apparence : %1$s</string>
-    <string name="appearance_light">Clair</string>
-    <string name="appearance_dark">Sombre</string>
 </resources>

@@ -21,7 +21,6 @@ public class HomeSettingsActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        Appearance.apply(this);
         if (state != null) { left = true; return; }
         try {
             startActivity(new Intent(Settings.ACTION_HOME_SETTINGS));

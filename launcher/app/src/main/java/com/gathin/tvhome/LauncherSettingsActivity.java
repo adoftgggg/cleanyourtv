@@ -38,7 +38,6 @@ public final class LauncherSettingsActivity extends Activity {
     private TextView animationsChoice;
     private TextView advancedChoice;
     private TextView followThemeChoice;
-    private TextView appearanceChoice;
     private TextView openOnStartChoice;
     private int columns;
     private int rowsBelowDock;
@@ -51,7 +50,6 @@ public final class LauncherSettingsActivity extends Activity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_launcher_settings);
-        Appearance.apply(this);
         choices = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE);
         Config config = Config.load(this);
         View reorderChoice = findViewById(R.id.reorderChoice);
@@ -125,12 +123,6 @@ public final class LauncherSettingsActivity extends Activity {
             reverseRow(dockChoices);
             reverseRow(clockChoices);
         }
-        appearanceChoice = findViewById(R.id.appearanceChoice);
-        appearanceChoice.setOnClickListener(v -> {
-            boolean light = !Appearance.isLight(this);
-            choices.edit().putString(Appearance.KEY, light ? Appearance.LIGHT : Appearance.DARK).apply();
-            recreate();
-        });
         wallpaperChoice = findViewById(R.id.wallpaperChoice);
         wallpaperChoice.setOnClickListener(v -> showWallpaperPicker());
         animationsChoice = findViewById(R.id.animationsChoice);
@@ -322,8 +314,6 @@ public final class LauncherSettingsActivity extends Activity {
         advancedChoice.setEnabled(animations);
         advancedChoice.setAlpha(animations ? 1f : 0.5f);
         String wallpaperCurrent = choices.getString(Config.WALLPAPER_CHOICE_KEY, null);
-        appearanceChoice.setText(getString(R.string.appearance_state,
-                getString(Appearance.isLight(this) ? R.string.appearance_light : R.string.appearance_dark)));
         wallpaperChoice.setText(getString(R.string.wallpaper_state,
                 "none".equals(wallpaperCurrent) ? getString(R.string.wallpaper_none)
                         : wallpaperCurrent != null ? wallpaperCurrent
