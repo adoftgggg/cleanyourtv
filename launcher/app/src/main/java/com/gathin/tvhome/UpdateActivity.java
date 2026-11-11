@@ -7,6 +7,7 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -46,6 +47,7 @@ public final class UpdateActivity extends Activity {
     private String checksumUrl;
     private long remoteVersionCode;
     private String remoteVersionName;
+    private boolean waitingForInstallPermission;
 
     @Override protected void attachBaseContext(android.content.Context base) {
         super.attachBaseContext(LauncherLocale.wrap(base));
@@ -227,6 +229,14 @@ public final class UpdateActivity extends Activity {
 
     private void launchInstaller(File apk) {
         try {
+            if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+                waitingForInstallPermission = true;
+                status.setText("Autorise CleanYourTV à installer des applications, puis reviens ici.");
+                Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:" + getPackageName()));
+                startActivity(settings);
+                return;
+            }
             Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".ota.provider", apk);
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setDataAndType(uri, "application/vnd.android.package-archive");
@@ -273,6 +283,20 @@ public final class UpdateActivity extends Activity {
             progress.setVisibility(View.GONE);
             Toast.makeText(this, message, Toast.LENGTH_LONG).show();
         });
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        if (waitingForInstallPermission) {
+            waitingForInstallPermission = false;
+            if (Build.VERSION.SDK_INT < 26 || getPackageManager().canRequestPackageInstalls()) {
+                File apk = new File(new File(getCacheDir(), "ota"), "cleanyourtv-update.apk");
+                if (apk.isFile()) launchInstaller(apk);
+                else showError("APK téléchargé introuvable. Relance la mise à jour.");
+            } else {
+                showError("Autorisation d'installation non accordée.");
+            }
+        }
     }
 
     @Override protected void onDestroy() {
