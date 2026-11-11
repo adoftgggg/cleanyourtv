@@ -28,6 +28,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -111,10 +113,14 @@ public final class UpdateActivity extends Activity {
                 }
                 if (foundApk == null || foundChecksum == null)
                     throw new Exception("Release incomplète : APK ou fichier SHA-256 absent.");
-                String codeText = release.optString("body", "")
-                        .replaceAll("(?s).*versionCode\\s*[:=]\\s*(\\d+).*", "$1");
-                long code = codeText.matches("\\d+") ? Long.parseLong(codeText) : 0;
-                if (code <= 0) throw new Exception("La description de la Release doit contenir versionCode: N.");
+                String releaseBody = release.optString("body", "");
+                Matcher versionMatcher = Pattern.compile("(?i)\\bversionCode\\s*[:=]\\s*(\\d+)\\b")
+                        .matcher(releaseBody);
+                if (!versionMatcher.find()) {
+                    throw new Exception("Métadonnée versionCode introuvable dans la description GitHub. Description reçue : "
+                            + (releaseBody.isEmpty() ? "(vide)" : releaseBody));
+                }
+                long code = Long.parseLong(versionMatcher.group(1));
                 String name = release.optString("name", release.getString("tag_name"));
                 apkUrl = foundApk;
                 checksumUrl = foundChecksum;
