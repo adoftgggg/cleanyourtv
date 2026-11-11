@@ -112,8 +112,8 @@ public final class UpdateActivity extends Activity {
                 if (foundApk == null || foundChecksum == null)
                     throw new Exception("Release incomplète : APK ou fichier SHA-256 absent.");
                 String codeText = release.optString("body", "")
-                        .replaceAll("(?s).*versionCode\\\\s*[:=]\\\\s*(\\\\d+).*", "$1");
-                long code = codeText.matches("\\\\d+") ? Long.parseLong(codeText) : 0;
+                        .replaceAll("(?s).*versionCode\\s*[:=]\\s*(\\d+).*", "$1");
+                long code = codeText.matches("\\d+") ? Long.parseLong(codeText) : 0;
                 if (code <= 0) throw new Exception("La description de la Release doit contenir versionCode: N.");
                 String name = release.optString("name", release.getString("tag_name"));
                 apkUrl = foundApk;
