@@ -18,8 +18,11 @@ public class GlassView extends View {
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint specular = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint rim = new Paint(Paint.ANTI_ALIAS_FLAG);
+    /** A dark line just inside the white rim, so the frame still shows around a white tile (Netflix and the like). */
+    private final Paint edge = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
+    private final RectF ring = new RectF();
     private final float density;
     private float radius;
     /** Glow colour as 0xRRGGBB: white normally, a festival's accent (diya gold) while a festive skin is on. */
@@ -29,14 +32,22 @@ public class GlassView extends View {
     /** glass_style rim or halo: no sheen and no fill, only the crisp rim (and, for halo, a lighter outer glow). */
     private boolean flat;
     private boolean halo;
+    /** Rim width in dp. The glow carries the app's colour; the rim stays white for contrast on any artwork. */
+    private static final float RIM_DP = 3f;
+    /** The dark line's width in dp; it sits on the tile's own edge, the white rim just outside it. */
+    private static final float EDGE_DP = 2.5f;
 
     public GlassView(Context context, AttributeSet attrs) {
         super(context, attrs);
         density = getResources().getDisplayMetrics().density;
         radius = 20f * density;
         rim.setStyle(Paint.Style.STROKE);
-        rim.setStrokeWidth(1.5f * density);
-        rim.setColor(0xCCFFFFFF);
+        // A thick, opaque white rim: the focused tile must read at a glance from the sofa.
+        rim.setStrokeWidth(RIM_DP * density);
+        rim.setColor(0xFFFFFFFF);
+        edge.setStyle(Paint.Style.STROKE);
+        edge.setStrokeWidth(EDGE_DP * density);
+        edge.setColor(0xD9000000);
         glow.setStyle(Paint.Style.STROKE);
         // Cache the slab as a texture. The spring only changes translation, so the GPU can
         // move it without replaying clipPath and the glow on every frame. That path is
@@ -48,16 +59,12 @@ public class GlassView extends View {
     void setAccent(int argb) {
         if (argb == 0) {
             glowRgb = 0xFFFFFF;
-            glowAlpha = 0x30;
-            rim.setColor(0xCCFFFFFF);
+            glowAlpha = 0x50;
         } else {
             glowRgb = argb & 0xFFFFFF;
-            glowAlpha = 0x70;
-            // The rim is the accent lifted towards white, so the edge still reads as glass, not paint.
-            int r = (((glowRgb >> 16) & 0xFF) + 255 * 2) / 3, g = (((glowRgb >> 8) & 0xFF) + 255 * 2) / 3,
-                    b = ((glowRgb & 0xFF) + 255 * 2) / 3;
-            rim.setColor(0xE6000000 | (r << 16) | (g << 8) | b);
+            glowAlpha = 0x90;
         }
+        rim.setColor(0xFFFFFFFF);
         invalidate();
     }
 
@@ -65,7 +72,7 @@ public class GlassView extends View {
     void setStyle(String style) {
         flat = Config.GLASS_RIM.equals(style) || Config.GLASS_HALO.equals(style);
         halo = Config.GLASS_HALO.equals(style);
-        rim.setStrokeWidth((flat ? 2f : 1.5f) * density);
+        rim.setStrokeWidth(RIM_DP * density);
         invalidate();
     }
 
@@ -102,7 +109,7 @@ public class GlassView extends View {
             }
         }
         if (flat) {
-            canvas.drawRoundRect(rect, radius, radius, rim);
+            drawFrame(canvas);
             return;
         }
 
@@ -115,6 +122,19 @@ public class GlassView extends View {
         canvas.drawRoundRect(rect, radius, radius, specular);
         canvas.restore();
 
-        canvas.drawRoundRect(rect, radius, radius, rim);
+        drawFrame(canvas);
+    }
+
+    /**
+     * The focus frame: a dark line on the tile's edge, then the white rim just outside it. White alone vanished
+     * around white tiles, dark alone around dark ones; the pair shows on any tile and any background.
+     */
+    private void drawFrame(Canvas canvas) {
+        float e = EDGE_DP * density / 2f;
+        ring.set(rect.left + e, rect.top + e, rect.right - e, rect.bottom - e);
+        canvas.drawRoundRect(ring, radius - e, radius - e, edge);
+        float r = RIM_DP * density / 2f + 0.5f * density;
+        ring.set(rect.left - r, rect.top - r, rect.right + r, rect.bottom + r);
+        canvas.drawRoundRect(ring, radius + r, radius + r, rim);
     }
 }

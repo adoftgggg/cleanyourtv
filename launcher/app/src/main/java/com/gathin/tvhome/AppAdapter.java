@@ -80,6 +80,9 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         int ambient;
         /** uniform_tiles card fill, top and bottom colour; null until sampled from the icon. */
         int[] backdrop;
+        /** The TV banner for Home's backdrop, loaded on first focus when the tile itself shows the icon. */
+        Drawable heroBanner;
+        boolean heroBannerLoaded;
 
         Entry(String label, ComponentName component, Drawable banner, Drawable icon) {
             this(APP, label, component, banner, icon, null, 0);
@@ -674,6 +677,32 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         if (position < 0 || position >= items.size()) return null;
         Entry e = items.get(position);
         return e.banner != null ? e.banner : e.icon;
+    }
+
+    /**
+     * The app's own TV banner, or null when it only has an icon. With uniform_tiles the tiles never load banners,
+     * so this one is loaded the first time the app is focused, and kept for the next time.
+     */
+    Drawable bannerAt(int position) {
+        if (position < 0 || position >= items.size()) return null;
+        Entry e = items.get(position);
+        if (e.banner != null) return e.banner;
+        if (e.kind != Entry.APP) return null;
+        if (!e.heroBannerLoaded) {
+            e.heroBannerLoaded = true;
+            PackageManager pm = ctx.getPackageManager();
+            try {
+                e.heroBanner = pm.getActivityBanner(e.component);
+            } catch (PackageManager.NameNotFoundException ignored) {
+            }
+            if (e.heroBanner == null) {
+                try {
+                    e.heroBanner = pm.getApplicationBanner(e.pkg);
+                } catch (PackageManager.NameNotFoundException ignored) {
+                }
+            }
+        }
+        return e.heroBanner;
     }
 
     float focusScale() {

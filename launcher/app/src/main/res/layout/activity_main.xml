@@ -30,6 +30,30 @@
         android:layout_height="match_parent"
         android:alpha="0" />
 
+    <!-- The focused app's own TV banner, large on the right and behind the tiles, faded towards the left
+         and the bottom so the clock, the names and the tiles stay readable (MainActivity.showHeroBanner). -->
+    <FrameLayout
+        android:id="@+id/heroBackdrop"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0"
+        android:visibility="gone"
+        android:importantForAccessibility="no">
+
+        <ImageView
+            android:id="@+id/heroBanner"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:importantForAccessibility="no" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/hero_backdrop_fade"
+            android:importantForAccessibility="no" />
+    </FrameLayout>
+
     <!-- Race-weekend panel (a theme's race_calendar, see RaceWeekend): in the free space under the clock,
          shown only from shortly before a weekend's first session until the race is over. Updated once a
          minute with the clock, never animated. -->

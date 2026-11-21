@@ -164,6 +164,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** config.xml cinematic_white_focus: the cinematic shelf keeps the white highlight. */
     private boolean cinematicWhiteFocus;
     private ImageView heroArt;
+    /** The focused app's TV banner, large and faded behind the tiles on the right (heroBackdrop). */
+    private View heroBackdrop;
+    private ImageView heroBanner;
+    private String heroBannerKey;
+    /** How strongly the backdrop banner shows: present, never louder than the tiles over it. */
+    private static final float BACKDROP_ALPHA = 0.4f;
     /** config.xml cinematic_dots: false leaves the dock position dots out of the cinematic shelf. */
     private boolean heroDotsShown = true;
     /** The artwork's opacity behind the cinematic shelf (config.xml cinematic_art); 0 leaves it out. */
@@ -534,6 +540,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         heroMeta = findViewById(R.id.heroMeta);
         heroDots = findViewById(R.id.heroDots);
         heroArt = findViewById(R.id.heroArt);
+        heroBackdrop = findViewById(R.id.heroBackdrop);
+        heroBanner = findViewById(R.id.heroBanner);
         cinematic = cfg.cinematicHome;
         glowStyle = cfg.glowStyle;
         heroDotsShown = cfg.cinematicDots;
@@ -1211,6 +1219,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             ambient.setAlpha(0f);
             heroArt.animate().cancel();
             heroArt.setAlpha(0f);
+            hideHeroBanner();
         }
         if (rebuild) reloadTiles();
         if (animate && entrance && animations && !reducedMotion) {
@@ -1261,6 +1270,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // An updated app may bring new artwork; the backdrop is cheap to make again.
         heroArtCache.clear();
         heroArtKey = null;
+        heroBannerKey = null;
         // One LEANBACK query for both the tiles and the card checks.
         final List<ResolveInfo> leanback = getPackageManager().queryIntentActivities(
                 new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER), 0);
@@ -1360,6 +1370,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         grid.getRecycledViewPool().clear();
         heroArtCache.clear();
         heroArtKey = null;
+        heroBannerKey = null;
         wallpaperPlayer.releaseForMemoryPressure();
         tileRefresh.invalidate();
     }
@@ -1658,8 +1669,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         if (dockEditSlot >= 0 && pos >= 0 && pos < COLUMNS && pos != dockEditSlot) return 0.45f;
         if (reordering) return 0.45f;
+        // While a tile has focus the others step back, so the focused one is obvious from across the room.
+        if (glassShown && pos != RecyclerView.NO_POSITION && pos != lastFocused) return UNFOCUSED_ALPHA;
         return 1f;
     }
+
+    /** The other tiles' brightness while one has focus. */
+    private static final float UNFOCUSED_ALPHA = 0.55f;
 
     /** Ends the mode and saves the order if it changed since the mode started. */
     private void endReorder() {
@@ -1889,6 +1905,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             revealRect.set(0, -(int) pad * 2, item.getWidth(), item.getHeight() + (int) pad);
             grid.requestChildRectangleOnScreen(item, revealRect, reducedMotion);
         }
+        dimOthers();
     }
 
     /** Refits the glass to the focused holder once the grid layout and tile dimensions settle. */
@@ -1921,6 +1938,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         float y = dockTopInRoot - 14 * density - 26 * density - hero.getHeight();
         boolean changed = !label.contentEquals(heroName.getText());
         if (cinematic && heroArtAlpha > 0f) showHeroArt(position);
+        showHeroBanner(position);
 
         if (!animations || reducedMotion) {
             // Snap the shelf instead of sliding and fading it: each of those frames repaints the
@@ -2063,6 +2081,49 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }).start();
     }
 
+    /**
+     * Shows the focused app's TV banner behind the tiles, on every row; an app with only an icon clears it.
+     * A new app fades the old banner out and the new one in, the way the shelf's name changes.
+     */
+    private void showHeroBanner(int position) {
+        String key = adapter.keyAt(position);
+        Drawable banner = adapter.bannerAt(position);
+        if (key == null || banner == null) {
+            hideHeroBanner();
+            return;
+        }
+        heroBackdrop.setVisibility(View.VISIBLE);
+        if (key.equals(heroBannerKey)) {
+            if (heroBackdrop.getAlpha() < BACKDROP_ALPHA) {
+                heroBackdrop.animate().cancel();
+                heroBackdrop.animate().alpha(BACKDROP_ALPHA).setDuration(300).start();
+            }
+            return;
+        }
+        heroBannerKey = key;
+        // A private copy: the tile may show the same drawable, and the ImageView changes its bounds.
+        final Drawable copy = banner.getConstantState() != null ? banner.getConstantState().newDrawable().mutate() : banner;
+        heroBackdrop.animate().cancel();
+        if (!animations || reducedMotion || heroBackdrop.getAlpha() == 0f) {
+            heroBanner.setImageDrawable(copy);
+            if (!animations || reducedMotion) heroBackdrop.setAlpha(BACKDROP_ALPHA);
+            else heroBackdrop.animate().alpha(BACKDROP_ALPHA).setDuration(360).start();
+            return;
+        }
+        heroBackdrop.animate().alpha(0f).setDuration(120).withEndAction(() -> {
+            heroBanner.setImageDrawable(copy);
+            heroBackdrop.animate().alpha(BACKDROP_ALPHA).setDuration(360).start();
+        }).start();
+    }
+
+    private void hideHeroBanner() {
+        if (heroBackdrop == null) return;
+        heroBackdrop.animate().cancel();
+        heroBackdrop.setAlpha(0f);
+        heroBackdrop.setVisibility(View.GONE);
+        heroBannerKey = null;
+    }
+
     private void fadeHeroArt(int ms) {
         if (!animations) heroArt.setAlpha(heroArtAlpha);
         else heroArt.animate().alpha(heroArtAlpha).setDuration(reducedMotion ? Math.min(ms, Motion.REDUCED_MS) : ms).start();
@@ -2201,8 +2262,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         hero.animate().cancel();
         ambient.animate().cancel();
         hero.setAlpha(0f);
-        heroArt.animate().cancel();
-        heroArt.setAlpha(0f);
+        showHeroBanner(position);
+        // Cinematic shelf: the backdrop follows the focused app on every row, not only the dock.
+        if (cinematic && heroArtAlpha > 0f) {
+            showHeroArt(position);
+        } else {
+            heroArt.animate().cancel();
+            heroArt.setAlpha(0f);
+        }
         heroShown = false;
         if (!ambientGlow) return;
         if (!animations || reducedMotion) {
@@ -2233,6 +2300,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         ambient.animate().cancel();
         heroArt.animate().cancel();
         heroShown = false;
+        hideHeroBanner();
         if (animations && !reducedMotion) {
             hero.animate().alpha(0f).setDuration(160).start();
             if (ambientGlow) ambient.animate().alpha(0f).setDuration(300).start();
@@ -2247,6 +2315,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private void hideGlass() {
         if (!glassShown) return;
         glassShown = false;
+        dimOthers();   // focus left the tiles: every tile back to full brightness
         glass.animate().cancel();
         if (animations && !reducedMotion) glass.animate().alpha(0f).setDuration(160).start();
         else glass.setAlpha(0f);

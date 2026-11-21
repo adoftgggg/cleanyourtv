@@ -1,22 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Settings rows and choices. Focus is a solid white pill with dark text (settings_choice_text), the one
+     thing on screen that cannot be missed from the sofa; the saved choice keeps a green outline. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
         <shape android:shape="rectangle">
-            <solid android:color="#5574A987" />
+            <solid android:color="#FFFFFFFF" />
             <corners android:radius="14dp" />
-            <stroke android:width="2dp" android:color="#FFB9E7C7" />
         </shape>
     </item>
     <item android:state_selected="true">
         <shape android:shape="rectangle">
-            <solid android:color="#334DAE6D" />
+            <solid android:color="#3361C987" />
             <corners android:radius="14dp" />
-            <stroke android:width="1dp" android:color="#FF4DAE6D" />
+            <stroke android:width="2dp" android:color="#FF61C987" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="#FF242B34" />
+            <solid android:color="#FF1C232B" />
             <corners android:radius="14dp" />
         </shape>
     </item>
