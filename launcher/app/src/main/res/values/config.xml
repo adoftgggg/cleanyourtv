@@ -242,6 +242,8 @@
          where the firmware hands KEYCODE_GUIDE (172) to the stock launcher and no app ever receives it. Leave empty
          to omit. -->
     <string-array name="app_keys" translatable="false">
+        <!-- This box (Xiaomi Mi Box S, Google TV remote): the YouTube button opens SmartTube instead. -->
+        <item>190:org.smarttube.stable</item>
     </string-array>
 
     <!-- Package of the stock launcher, for TVs whose firmware turns it back on after it was disabled. XGIMI's
