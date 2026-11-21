@@ -244,6 +244,10 @@
     <string-array name="app_keys" translatable="false">
         <!-- This box (Xiaomi Mi Box S, Google TV remote): the YouTube button opens SmartTube instead. -->
         <item>190:org.smarttube.stable</item>
+        <!-- Netflix sends KEY_VIDEOPHONE (scancode 416, BUTTON_6) and Prime Video KEY_PLAY (207, BUTTON_7); only the
+             disabled stock launcher answered them. -->
+        <item>KEYCODE_BUTTON_6:com.netflix.ninja</item>
+        <item>KEYCODE_BUTTON_7:com.amazon.amazonvideo.livingroom</item>
     </string-array>
 
     <!-- Package of the stock launcher, for TVs whose firmware turns it back on after it was disabled. XGIMI's
