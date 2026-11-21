@@ -118,11 +118,13 @@ public final class UpdateActivity extends Activity {
                 if (foundApk == null || foundChecksum == null)
                     throw new Exception("Release incomplète : APK ou fichier SHA-256 absent.");
                 String releaseBody = release.optString("body", "");
-                Matcher versionMatcher = Pattern.compile("(?i)\\bversionCode\\s*[:=]\\s*(\\d+)\\b")
+                // "versionCode: 21", "versionCode=21" or "versionCode 21": the separator is optional, since a
+                // release once shipped with a space only and every box refused it.
+                Matcher versionMatcher = Pattern.compile("(?i)\\bversionCode\\s*[:=]?\\s*(\\d+)\\b")
                         .matcher(releaseBody);
                 if (!versionMatcher.find()) {
-                    throw new Exception("Métadonnée versionCode introuvable dans la description GitHub. Description reçue : "
-                            + (releaseBody.isEmpty() ? "(vide)" : releaseBody));
+                    throw new Exception("Cette Release n'indique pas son numéro de version : sa description doit "
+                            + "contenir une ligne « versionCode: N ». Rien n'a été téléchargé.");
                 }
                 long code = Long.parseLong(versionMatcher.group(1));
                 String name = release.optString("name", release.getString("tag_name"));
