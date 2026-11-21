@@ -557,7 +557,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         }
         try {
             ctx.startActivity(i);
-            if (cinematic) LastOpened.record(ctx, e.pkg);
+            LastOpened.record(ctx, e.pkg);   // the "Last opened" line under the app's name, on every Home
             if (advancedEffects && !reducedMotion && ctx instanceof Activity) {
                 ((Activity) ctx).overridePendingTransition(R.anim.app_open_enter, R.anim.app_open_exit);
             }
@@ -692,14 +692,14 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             e.heroBannerLoaded = true;
             PackageManager pm = ctx.getPackageManager();
             try {
-                e.heroBanner = pm.getActivityBanner(e.component);
-            } catch (PackageManager.NameNotFoundException ignored) {
-            }
-            if (e.heroBanner == null) {
-                try {
-                    e.heroBanner = pm.getApplicationBanner(e.pkg);
-                } catch (PackageManager.NameNotFoundException ignored) {
+                // The sharpest artwork the app ships: the backdrop draws it far larger than a tile does.
+                android.content.pm.ActivityInfo info = pm.getActivityInfo(e.component, 0);
+                int id = info.banner != 0 ? info.banner : info.applicationInfo.banner;
+                if (id != 0) {
+                    e.heroBanner = pm.getResourcesForApplication(info.applicationInfo)
+                            .getDrawableForDensity(id, DisplayMetrics.DENSITY_XXXHIGH, null);
                 }
+            } catch (PackageManager.NameNotFoundException | android.content.res.Resources.NotFoundException ignored) {
             }
         }
         return e.heroBanner;

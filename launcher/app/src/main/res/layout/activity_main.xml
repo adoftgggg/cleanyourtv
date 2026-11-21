@@ -30,8 +30,8 @@
         android:layout_height="match_parent"
         android:alpha="0" />
 
-    <!-- The focused app's own TV banner, large on the right and behind the tiles, faded towards the left
-         and the bottom so the clock, the names and the tiles stay readable (MainActivity.showHeroBanner). -->
+    <!-- The focused app's own TV banner behind the tiles, top right, at little more than its own size so it stays
+         sharp, its left and bottom edges faded out in the bitmap itself (MainActivity.showHeroBanner). -->
     <FrameLayout
         android:id="@+id/heroBackdrop"
         android:layout_width="match_parent"
@@ -42,15 +42,11 @@
 
         <ImageView
             android:id="@+id/heroBanner"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="centerCrop"
-            android:importantForAccessibility="no" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@drawable/hero_backdrop_fade"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="112dp"
+            android:scaleType="center"
             android:importantForAccessibility="no" />
     </FrameLayout>
 
@@ -275,6 +271,22 @@
                         android:layout_marginBottom="9dp"
                         android:orientation="vertical">
 
+                        <!-- The weather now ("9°  ·  Nuageux"), above the date, from the Weather add-on (weather_app). -->
+                        <TextView
+                            android:id="@+id/weatherLine"
+                            android:gravity="left"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="6dp"
+                            android:singleLine="true"
+                            android:ellipsize="end"
+                            android:textColor="#F2FFFFFF"
+                            android:textSize="18sp"
+                            android:fontFamily="@string/font_regular"
+                            android:letterSpacing="0.02"
+                            android:includeFontPadding="false"
+                            android:visibility="gone" />
+
                         <!-- Shamsi date ("27 Mehr 1405"), shown when shamsi_date is on. -->
                         <TextView
                             android:id="@+id/shamsiDate"
@@ -435,5 +447,18 @@
         android:layout_width="10dp"
         android:layout_height="10dp"
         android:alpha="0"
+        android:importantForAccessibility="no" />
+
+    <!-- Night mode (night_mode): a black veil over all of Home from night_start_hour to night_end_hour, so the
+         screen does not light up a dark room. Never focusable or clickable: the remote works through it. -->
+    <View
+        android:id="@+id/nightShade"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FF000000"
+        android:alpha="0"
+        android:visibility="gone"
+        android:clickable="false"
+        android:focusable="false"
         android:importantForAccessibility="no" />
 </FrameLayout>

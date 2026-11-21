@@ -208,6 +208,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private TextView raceKicker, raceHeadline, raceSessions;
     /** game_day: each team's next game from an add-on, rotating in the race panel; null when the key is off. */
     private GameDay gameDay;
+    /** The weather now above the date, for the city picked in launcher settings (HomeWeather). */
+    private HomeWeather homeWeather;
+    private TextView weatherLine;
     private View raceBar;
     private LinearLayout racePager;
     private long rotationStart;
@@ -538,6 +541,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         // shelf would render it through an offscreen buffer first, as the glow above notes.
         hero.forceHasOverlappingRendering(false);
         heroMeta = findViewById(R.id.heroMeta);
+        // "Last opened" shows under every dock app's name; invisible, not gone, so the name never jumps when it fills.
+        heroMeta.setVisibility(View.INVISIBLE);
         heroDots = findViewById(R.id.heroDots);
         heroArt = findViewById(R.id.heroArt);
         heroBackdrop = findViewById(R.id.heroBackdrop);
@@ -593,6 +598,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         raceBar = findViewById(R.id.raceBar);
         racePager = findViewById(R.id.racePager);
         gameDay = GameDay.create(this, cfg.gameDay, handler, this::updatePanel);
+        weatherLine = findViewById(R.id.weatherLine);
+        homeWeather = new HomeWeather(this, handler, this::updateWeatherLine);
         // The rotation runs on the clock that never jumps: setting the TV's time must not stall or stretch a turn.
         rotationStart = SystemClock.elapsedRealtime();
         showStats = cfg.showStats;
@@ -1131,7 +1138,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         updatePanel();
         // Back from an app opened from its tile, focus is still on that tile, so the cinematic "Last opened" line kept
         // the time from before this launch ("2 days ago" right after opening it). Refresh it.
-        if (cinematic && heroMeta != null && lastFocused >= 0 && lastFocused < adapter.appCount()) updateHeroMeta(lastFocused);
+        if (heroMeta != null && heroShown && lastFocused >= 0 && lastFocused < adapter.appCount()) updateHeroMeta(lastFocused);
         // The network and Inputs pills keep their state while Home is in the background, and callbacks update them
         // when the network or the inputs change, so this refresh only catches anything missed. Its binder calls
         // (about 7 ms on a TCL C755, most of it WifiManager.getConnectionInfo) would hold up the first frame back
@@ -1145,6 +1152,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         if (showStats) startStats();
         if (gameDay != null) gameDay.start();
+        if (homeWeather != null) homeWeather.start();
         sky.update();
         wallpaperPlayer.start();
         handler.postDelayed(minuteTick, MINUTE_MS);
@@ -1269,6 +1277,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         final List<Cards.Card> none = Collections.emptyList();
         // An updated app may bring new artwork; the backdrop is cheap to make again.
         heroArtCache.clear();
+        bannerCache.evictAll();
         heroArtKey = null;
         heroBannerKey = null;
         // One LEANBACK query for both the tiles and the card checks.
@@ -1332,6 +1341,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         startPending = null;   // leaving Home before the network came back: the boot's app stays closed
         stopStats();
         if (gameDay != null) gameDay.stop();
+        if (homeWeather != null) homeWeather.stop();
         handler.removeCallbacks(turnTick);
         if (lamp != null) lamp.stop();
         cancelPendingFocusScroll();
@@ -1369,6 +1379,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         grid.setAdapter(null);
         grid.getRecycledViewPool().clear();
         heroArtCache.clear();
+        bannerCache.evictAll();
         heroArtKey = null;
         heroBannerKey = null;
         wallpaperPlayer.releaseForMemoryPressure();
@@ -1393,6 +1404,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         RemoteKeys.release(this);
         cancelHoldOk();
         if (gameDay != null) gameDay.shutdown();
+        if (homeWeather != null) homeWeather.shutdown();
         unregisterReceiver(packageReceiver);
         if (openOnStartOnWake) unregisterReceiver(wakeReceiver);
         wallpaperPlayer.close();
@@ -2001,12 +2013,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
     }
 
-    /** The shelf's text for this dock app: its name and, on the cinematic shelf, "Last opened" and the dots. */
+    /** The shelf's text for this dock app: its name, "Last opened", and on the cinematic shelf the dots. */
     private void fillHero(int position, String label) {
         heroName.setText(label);
-        if (!cinematic) return;
         updateHeroMeta(position);
-        updateHeroDots(position);
+        if (cinematic) updateHeroDots(position);
     }
 
     // ---- cinematic shelf -------------------------------------------------------------------------
@@ -2101,19 +2112,56 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             return;
         }
         heroBannerKey = key;
-        // A private copy: the tile may show the same drawable, and the ImageView changes its bounds.
-        final Drawable copy = banner.getConstantState() != null ? banner.getConstantState().newDrawable().mutate() : banner;
+        Bitmap faded = bannerCache.get(key);
+        if (faded == null) {
+            faded = fadedBanner(banner);
+            if (faded == null) {
+                hideHeroBanner();
+                return;
+            }
+            bannerCache.put(key, faded);
+        }
+        final Bitmap copy = faded;
         heroBackdrop.animate().cancel();
         if (!animations || reducedMotion || heroBackdrop.getAlpha() == 0f) {
-            heroBanner.setImageDrawable(copy);
+            heroBanner.setImageBitmap(copy);
             if (!animations || reducedMotion) heroBackdrop.setAlpha(BACKDROP_ALPHA);
             else heroBackdrop.animate().alpha(BACKDROP_ALPHA).setDuration(360).start();
             return;
         }
         heroBackdrop.animate().alpha(0f).setDuration(120).withEndAction(() -> {
-            heroBanner.setImageDrawable(copy);
+            heroBanner.setImageBitmap(copy);
             heroBackdrop.animate().alpha(BACKDROP_ALPHA).setDuration(360).start();
         }).start();
+    }
+
+    /** The last few faded banners, about 2 MB each at 1080p: moving back and forth along the dock redraws none. */
+    private final android.util.LruCache<String, Bitmap> bannerCache = new android.util.LruCache<>(4);
+
+    /**
+     * The banner drawn once into a bitmap 45% of the screen wide (16:9), under the top buttons, at little more than the size apps ship it,
+     * so it stays sharp instead of being stretched over the whole screen. Its left quarter, top quarter and bottom half fade to
+     * transparent inside the bitmap, so no edge shows over the backdrop. Null when the screen has no size yet.
+     */
+    private Bitmap fadedBanner(Drawable banner) {
+        int screenW = root.getWidth() > 0 ? root.getWidth() : getResources().getDisplayMetrics().widthPixels;
+        int w = Math.round(screenW * 0.45f), h = Math.round(w * 9 / 16f);
+        if (w <= 0 || h <= 0) return null;
+        Drawable d = banner.getConstantState() != null ? banner.getConstantState().newDrawable(getResources()).mutate() : banner;
+        if (d instanceof BitmapDrawable) ((BitmapDrawable) d).setFilterBitmap(true);
+        Bitmap out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(out);
+        d.setBounds(0, 0, w, h);
+        d.draw(c);
+        Paint mask = new Paint(Paint.ANTI_ALIAS_FLAG);
+        mask.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_IN));
+        mask.setShader(new LinearGradient(0, 0, w * 0.25f, 0, 0x00000000, 0xFF000000, Shader.TileMode.CLAMP));
+        c.drawRect(0, 0, w, h, mask);
+        // Top, middle, bottom: faded in over the top quarter, solid in the middle, faded out over the bottom half.
+        mask.setShader(new LinearGradient(0, 0, 0, h, new int[] {0x00000000, 0xFF000000, 0xFF000000, 0x00000000},
+                new float[] {0f, 0.25f, 0.5f, 1f}, Shader.TileMode.CLAMP));
+        c.drawRect(0, 0, w, h, mask);
+        return out;
     }
 
     private void hideHeroBanner() {
@@ -2122,6 +2170,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         heroBackdrop.setAlpha(0f);
         heroBackdrop.setVisibility(View.GONE);
         heroBannerKey = null;
+    }
+
+    /** The weather add-on answered: show its line above the date, or hide the line when it has nothing recent. */
+    private void updateWeatherLine() {
+        if (weatherLine == null || homeWeather == null) return;
+        String text = homeWeather.line();
+        weatherLine.setText(text);
+        weatherLine.setVisibility(text.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
     private void fadeHeroArt(int ms) {
@@ -2798,7 +2854,31 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
     }
 
+    /** The key that switches night mode on the TV (launcher settings); config.xml night_mode is the default. */
+    static final String NIGHT_MODE_KEY = "night_mode";
+
+    /**
+     * Night mode: the black veil over Home between night_start_hour and night_end_hour, at night_dim percent. Runs
+     * with the greeting, so on every minute and whenever Home comes back.
+     */
+    private void updateNightShade() {
+        View shade = findViewById(R.id.nightShade);
+        if (shade == null) return;
+        boolean on = getSharedPreferences(Config.SETTINGS_NAME, MODE_PRIVATE)
+                .getBoolean(NIGHT_MODE_KEY, getResources().getBoolean(R.bool.night_mode));
+        int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+        int start = getResources().getInteger(R.integer.night_start_hour);
+        int end = getResources().getInteger(R.integer.night_end_hour);
+        boolean night = start == end ? false : start < end ? hour >= start && hour < end : hour >= start || hour < end;
+        float alpha = on && night ? Math.max(0, Math.min(90, getResources().getInteger(R.integer.night_dim))) / 100f : 0f;
+        if (shade.getAlpha() == alpha && (alpha > 0) == (shade.getVisibility() == View.VISIBLE)) return;
+        shade.animate().cancel();
+        shade.setVisibility(alpha > 0 ? View.VISIBLE : View.GONE);
+        shade.setAlpha(alpha);
+    }
+
     private void updateGreeting() {
+        updateNightShade();
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
         int res;
         // Locale-specific day parts (app language on Android 13+).

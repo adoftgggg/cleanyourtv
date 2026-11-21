@@ -485,6 +485,13 @@
          online. A theme can set "game_day". -->
     <string name="game_day" translatable="false"></string>
 
+    <!-- Night mode: from night_start_hour to night_end_hour (local time, 0 to 23) Home is dimmed by night_dim percent,
+         so it does not light up a dark room. Launcher settings can switch it off on the TV. -->
+    <bool name="night_mode">true</bool>
+    <integer name="night_start_hour">22</integer>
+    <integer name="night_end_hour">7</integer>
+    <integer name="night_dim">40</integer>
+
     <!-- Time-of-day backdrop behind everything: a dark gradient that follows the clock, with a warm
          horizon glow around sunrise and sunset. 0 keeps the plain background (the default); 1 to 100
          sets its opacity. Around 60 reads clearly without hiding a wallpaper. Can also be set with

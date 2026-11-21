@@ -37,6 +37,8 @@ public final class LauncherSettingsActivity extends Activity {
     private TextView wallpaperChoice;
     private TextView animationsChoice;
     private TextView advancedChoice;
+    private TextView nightChoice;
+    private TextView weatherChoice;
     private TextView followThemeChoice;
     private TextView openOnStartChoice;
     private int columns;
@@ -147,6 +149,14 @@ public final class LauncherSettingsActivity extends Activity {
                         .show();
             }
         });
+        weatherChoice = findViewById(R.id.weatherChoice);
+        weatherChoice.setOnClickListener(v -> askCity());
+        nightChoice = findViewById(R.id.nightChoice);
+        nightChoice.setOnClickListener(v -> {
+            choices.edit().putBoolean(MainActivity.NIGHT_MODE_KEY, !nightMode()).apply();
+            changed();
+            refresh();
+        });
         openOnStartChoice = findViewById(R.id.openOnStartChoice);
         if (config.openOnStartChoice) {
             openOnStartChoice.setVisibility(View.VISIBLE);
@@ -157,7 +167,8 @@ public final class LauncherSettingsActivity extends Activity {
             if (!hasOnTvChoices()) return;
             choices.edit().remove("columns").remove(Config.ROWS_BELOW_DOCK_KEY).remove("animations")
                     .remove("advanced_effects").remove(Config.WALLPAPER_CHOICE_KEY)
-                    .remove(Config.DOCK_OPACITY_KEY).remove(Config.CLOCK_FORMAT_KEY).remove(OpenOnStart.KEY).commit();
+                    .remove(Config.DOCK_OPACITY_KEY).remove(Config.CLOCK_FORMAT_KEY).remove(OpenOnStart.KEY)
+                    .remove(MainActivity.NIGHT_MODE_KEY).commit();
             Config current = Config.load(this);
             columns = current.columns;
             rowsBelowDock = current.rowsBelowDock;
@@ -319,14 +330,84 @@ public final class LauncherSettingsActivity extends Activity {
                         : wallpaperCurrent != null ? wallpaperCurrent
                         : getString(R.string.wallpaper_theme_default)));
         openOnStartChoice.setText(getString(R.string.open_on_start_state, openOnStartLabel()));
+        nightChoice.setText(getString(R.string.night_mode_state, getString(nightMode() ? R.string.on : R.string.off)));
+        String city = HomeWeather.city(this);
+        weatherChoice.setText(getString(R.string.weather_city_state, city.isEmpty() ? getString(R.string.off) : city));
         followThemeChoice.setSelected(!hasOnTvChoices());
+    }
+
+    /**
+     * The city for the weather line: type a name with the remote's keyboard, then pick it from the matches. With a city
+     * set, Off clears it and hides the line. Only the typed name, then the picked city's position, leave the TV.
+     */
+    private void askCity() {
+        android.widget.EditText input = new android.widget.EditText(this);
+        input.setSingleLine(true);
+        input.setHint(R.string.weather_search_hint);
+        input.setText(HomeWeather.city(this));
+        input.setSelectAllOnFocus(true);
+        AlertDialog.Builder b = new AlertDialog.Builder(this)
+                .setTitle(R.string.weather_search_title)
+                .setView(input)
+                .setPositiveButton(R.string.search, (d, w) -> searchCity(input.getText().toString()))
+                .setNegativeButton(android.R.string.cancel, null);
+        if (!HomeWeather.city(this).isEmpty()) {
+            b.setNeutralButton(R.string.off, (d, w) -> {
+                HomeWeather.clearCity(this);
+                changed();
+                refresh();
+            });
+        }
+        b.show();
+    }
+
+    private void searchCity(String typed) {
+        if (typed.trim().isEmpty()) return;
+        new Thread(() -> {
+            List<HomeWeather.Place> found;
+            try {
+                found = HomeWeather.search(typed);
+            } catch (Exception e) {
+                found = null;
+            }
+            List<HomeWeather.Place> result = found;
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                if (result == null) {
+                    Toast.makeText(this, R.string.weather_search_failed, Toast.LENGTH_LONG).show();
+                } else if (result.isEmpty()) {
+                    Toast.makeText(this, getString(R.string.weather_search_none, typed.trim()), Toast.LENGTH_LONG).show();
+                } else {
+                    String[] labels = new String[result.size()];
+                    for (int i = 0; i < labels.length; i++) {
+                        HomeWeather.Place p = result.get(i);
+                        labels[i] = p.detail.isEmpty() ? p.name : p.name + " — " + p.detail;
+                    }
+                    new AlertDialog.Builder(this)
+                            .setTitle(R.string.weather_search_title)
+                            .setItems(labels, (d, which) -> {
+                                HomeWeather.setCity(this, result.get(which));
+                                changed();
+                                refresh();
+                            })
+                            .setNegativeButton(android.R.string.cancel, null)
+                            .show();
+                }
+            });
+        }, "city-search").start();
+    }
+
+    /** Night mode as saved on this TV, else config.xml's night_mode. */
+    private boolean nightMode() {
+        return choices.getBoolean(MainActivity.NIGHT_MODE_KEY, getResources().getBoolean(R.bool.night_mode));
     }
 
     private boolean hasOnTvChoices() {
         return choices.contains("columns") || choices.contains(Config.ROWS_BELOW_DOCK_KEY)
                 || choices.contains("animations") || choices.contains("advanced_effects")
                 || choices.contains(Config.WALLPAPER_CHOICE_KEY) || choices.contains(Config.DOCK_OPACITY_KEY)
-                || choices.contains(Config.CLOCK_FORMAT_KEY) || choices.contains(OpenOnStart.KEY);
+                || choices.contains(Config.CLOCK_FORMAT_KEY) || choices.contains(OpenOnStart.KEY)
+                || choices.contains(MainActivity.NIGHT_MODE_KEY);
     }
 
     private void open(Intent intent) {

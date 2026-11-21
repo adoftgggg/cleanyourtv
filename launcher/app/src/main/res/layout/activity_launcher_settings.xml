@@ -88,6 +88,11 @@
             android:text="@string/settings_section_look" />
 
         <TextView
+            android:id="@+id/weatherChoice"
+            style="@style/SettingsRow"
+            android:layout_marginBottom="12dp" />
+
+        <TextView
             android:id="@+id/wallpaperChoice"
             style="@style/SettingsRow" />
 
@@ -104,6 +109,11 @@
         <TextView
             style="@style/SettingsHint"
             android:text="@string/advanced_effects_warning" />
+
+        <TextView
+            android:id="@+id/nightChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="16dp" />
 
         <TextView
             style="@style/SettingsLabel"
